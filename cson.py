@@ -9,6 +9,7 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 import argparse, copy, json, sys
+import collections
 __all__ = ('loads', )
 
 def isName(char):
@@ -401,7 +402,8 @@ def _decode_list(data):
 
 def _decode_dict(data):
     """ Only used for Python2.X """
-    rv = {}
+#    rv = {}
+    rv = OrderedDict()
     for key, value in data.iteritems():
         if isinstance(key, unicode):
             key = key.encode('utf-8')
@@ -417,9 +419,10 @@ def _decode_dict(data):
 def csons2py(csonString):
     # First convert the CSON -> JSON -> dataObj
     if sys.version_info[0] < 3:
-        dataObj = json.loads(toJSON(csonString), object_hook=_decode_dict)
+        dataObj = json.loads(toJSON(csonString), object_hook=_decode_dict,
+                object_pairs_hook=collections.OrderedDict)
     else:
-        dataObj = json.loads(toJSON(csonString))
+        dataObj = json.loads(toJSON(csonString), object_pairs_hook=collections.OrderedDict)
 
     # Next, @references are converted to "@@@reference" strings.  Let's find all
     # references in the data and put them in a list
@@ -449,7 +452,7 @@ def main():
     data = load(args.input_file)
     if args.filename:
         with open(args.filename, 'w') as outfile:
-            outfile.write(json.dumps(data))
+            outfile.write(json.dumps(data, indent=4, separators=(',', ': ')))
     else:
         print(json_data)
 
