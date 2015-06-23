@@ -469,7 +469,7 @@ def csons2py(csonString):
     return dataObj
 
 def cson2py(filename):
-    with open(filename, 'r') as infile:
+    with open(filename, 'r') if len(filename) > 0 else sys.stdin as infile:
         return csons2py(''.join(infile.readlines()))
 
 def main():
@@ -479,7 +479,7 @@ def main():
     parser = argparse.ArgumentParser(description='A Python implementation of a CSON interpreter. https://pypi.python.org/pypi/python-cson')
     parser.add_argument("-f", "--file", "-o", "--output", dest="filename", required=True, help="hash table filename", metavar="OUTPUT_FILE")
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False, help="Print all warnings")
-    parser.add_argument('input_file')
+    parser.add_argument('input_file', nargs='?', default='', help='input file')
 
     args = parser.parse_args()
 
