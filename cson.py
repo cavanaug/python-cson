@@ -477,7 +477,7 @@ def main():
     Define and parse `optparse` options for command-line usage.
     """
     parser = argparse.ArgumentParser(description='A Python implementation of a CSON interpreter. https://pypi.python.org/pypi/python-cson')
-    parser.add_argument("-f", "--file", dest="filename", required=True, help="hash table filename", metavar="OUTPUT_FILE")
+    parser.add_argument("-f", "--file", "-o", "--output", dest="filename", required=True, help="hash table filename", metavar="OUTPUT_FILE")
     parser.add_argument("-v", "--verbose", action="store_true", dest="verbose", default=False, help="Print all warnings")
     parser.add_argument('input_file')
 
@@ -487,7 +487,7 @@ def main():
         data = load(args.input_file)
     except CSONDecodeError as e:
         json_lines=e.doc.split(os.linesep)
-        print("\nError: ",e.message,file=sys.stderr)
+        print("\nCSON->JSON Error (Bad JSON): ",e.message,file=sys.stderr)
         print('\n'.join(json_lines[(0 if e.lineno<5 else e.lineno-5):e.lineno]),file=sys.stderr)
         print((e.colno-2)*' ','^'*10,file=sys.stderr)
         print('\n'.join(json_lines[e.lineno+1:e.lineno+6]),file=sys.stderr)
