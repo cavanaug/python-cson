@@ -8,9 +8,37 @@
 # note: based on CSON-js by JongChan Choi, https://github.com/disjukr/CSON-js
 from __future__ import print_function
 from __future__ import unicode_literals
-import argparse, copy, json, sys
+import argparse, copy, json, sys, os
 import collections
 __all__ = ('loads', )
+
+
+class CSONDecodeError(ValueError):
+    """Subclass of ValueError with the following additional properties:
+    msg: The unformatted error message
+    doc: The JSON document being parsed
+    pos: The start index of doc where parsing failed
+    end: The end index of doc where parsing failed (may be None)
+    lineno: The line corresponding to pos
+    colno: The column corresponding to pos
+    endlineno: The line corresponding to end (may be None)
+    endcolno: The column corresponding to end (may be None)
+    """
+    # Note that this exception is used from _speedups
+    def __init__(self, msg, doc, pos, end=None):
+        ValueError.__init__(self, json.decoder.errmsg(msg, doc, pos, end=end))
+        self.msg = msg
+        self.doc = doc
+        self.pos = pos
+        self.end = end
+        self.lineno, self.colno = json.decoder.linecol(doc, pos)
+        if end is not None:
+            self.endlineno, self.endcolno = linecol(doc, end)
+        else:
+            self.endlineno, self.endcolno = None, None
+
+    def __reduce__(self):
+        return self.__class__, (self.msg, self.doc, self.pos, self.end)
 
 def isName(char):
     return not ((char == ',') or
@@ -215,7 +243,7 @@ def tokenize(text):
             tokens.append(''.join(buffer))
     return tokens
 
-def toJSON(text, indent=0):
+def toJSON(text, indent=1):
     """ Convert 'text' from cson to a json string """
 
     # first tokenize the string
@@ -324,7 +352,7 @@ def toJSON(text, indent=0):
 
     return ''.join(tokens)
 
-def csons2json(csonString, indent=0):
+def csons2json(csonString, indent=1):
     return toJSON(csonString, indent)
 
 def getrefvalue(dataObj, ref):
@@ -418,11 +446,17 @@ def _decode_dict(data):
 
 def csons2py(csonString):
     # First convert the CSON -> JSON -> dataObj
-    if sys.version_info[0] < 3:
-        dataObj = json.loads(toJSON(csonString), object_hook=_decode_dict,
-                object_pairs_hook=collections.OrderedDict)
-    else:
-        dataObj = json.loads(toJSON(csonString), object_pairs_hook=collections.OrderedDict)
+    data=toJSON(csonString,1)
+    try:
+        if sys.version_info[0] < 3:
+            dataObj = json.loads(data, object_hook=_decode_dict, object_pairs_hook=collections.OrderedDict)
+        else:
+            dataObj = json.loads(data, object_pairs_hook=collections.OrderedDict)
+    except ValueError as e:
+        errormsg=e.message.translate(None,str('()')).split(': ')
+        errorpos=errormsg[1].split(' ')
+        raise CSONDecodeError(errormsg[0], data, int(errorpos[5]), None)
+
 
     # Next, @references are converted to "@@@reference" strings.  Let's find all
     # references in the data and put them in a list
@@ -449,7 +483,15 @@ def main():
 
     args = parser.parse_args()
 
-    data = load(args.input_file)
+    try:
+        data = load(args.input_file)
+    except CSONDecodeError as e:
+        json_lines=e.doc.split(os.linesep)
+        print("\nError: ",e.message,file=sys.stderr)
+        print('\n'.join(json_lines[(0 if e.lineno<5 else e.lineno-5):e.lineno]),file=sys.stderr)
+        print((e.colno-2)*' ','^'*10,file=sys.stderr)
+        print('\n'.join(json_lines[e.lineno+1:e.lineno+6]),file=sys.stderr)
+        sys.exit(1)
     if args.filename:
         with open(args.filename, 'w') as outfile:
             outfile.write(json.dumps(data, indent=4, separators=(',', ': ')))
